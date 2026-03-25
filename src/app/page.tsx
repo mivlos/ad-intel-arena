@@ -5,6 +5,7 @@ import TopBar from '@/components/TopBar';
 import QueryInput from '@/components/QueryInput';
 import ModelColumn from '@/components/ModelColumn';
 import SummaryBar from '@/components/SummaryBar';
+import ZappiChat from '@/components/ZappiChat';
 import {
   ModelId,
   ModelState,
@@ -14,7 +15,10 @@ import {
 } from '@/lib/types';
 
 const HISTORY_KEY = 'ad-intel-arena-history';
+const TAB_KEY = 'ad-intel-arena-tab';
 const MAX_HISTORY = 10;
+
+type ActiveTab = 'arena' | 'zappi-chat';
 
 const MODEL_IDS: ModelId[] = ['zappi', 'claude', 'gemini', 'openai'];
 
@@ -42,6 +46,7 @@ function makeInitialModels(): Record<ModelId, ModelState> {
 }
 
 export default function HomePage() {
+  const [activeTab, setActiveTab] = useState<ActiveTab>('arena');
   const [mode, setMode] = useState<QueryMode>('creative');
   const [models, setModels] = useState<Record<ModelId, ModelState>>(makeInitialModels());
   const [history, setHistory] = useState<QueryHistoryEntry[]>([]);
@@ -52,6 +57,21 @@ export default function HomePage() {
       if (stored) setHistory(JSON.parse(stored));
     } catch {
       // ignore parse errors
+    }
+    try {
+      const storedTab = localStorage.getItem(TAB_KEY);
+      if (storedTab === 'arena' || storedTab === 'zappi-chat') setActiveTab(storedTab);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const handleTabChange = useCallback((tab: ActiveTab) => {
+    setActiveTab(tab);
+    try {
+      localStorage.setItem(TAB_KEY, tab);
+    } catch {
+      // ignore
     }
   }, []);
 
@@ -221,27 +241,61 @@ export default function HomePage() {
   );
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <TopBar mode={mode} onModeChange={setMode} />
-
-      <div className="py-6 border-b border-zinc-800/60 bg-zinc-950">
-        <QueryInput mode={mode} onSubmit={handleSubmit} isLoading={anyActive} />
-      </div>
-
-      <div className="flex-1 overflow-auto p-4 md:p-6 bg-zinc-950">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 min-h-[500px]">
-          {MODEL_IDS.map((id) => (
-            <ModelColumn
-              key={id}
-              modelId={id}
-              state={models[id]}
-              onRating={(rating) => handleRating(id, rating)}
-            />
-          ))}
+    <div className="flex flex-col min-h-screen bg-zinc-950">
+      {/* Tab toggle — very top of page */}
+      <div className="sticky top-0 z-20 flex items-center px-6 py-2 bg-zinc-950 border-b border-zinc-800">
+        <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-lg p-1">
+          <button
+            onClick={() => handleTabChange('arena')}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+              activeTab === 'arena'
+                ? 'bg-zinc-700 text-white shadow-sm'
+                : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            Arena
+          </button>
+          <button
+            onClick={() => handleTabChange('zappi-chat')}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+              activeTab === 'zappi-chat'
+                ? 'bg-zinc-700 text-white shadow-sm'
+                : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            Zappi Chat
+          </button>
         </div>
       </div>
 
-      <SummaryBar models={models} history={history} onHistoryClick={handleHistoryClick} />
+      {activeTab === 'arena' ? (
+        <>
+          <TopBar mode={mode} onModeChange={setMode} />
+
+          <div className="py-6 border-b border-zinc-800/60 bg-zinc-950">
+            <QueryInput mode={mode} onSubmit={handleSubmit} isLoading={anyActive} />
+          </div>
+
+          <div className="flex-1 overflow-auto p-4 md:p-6 bg-zinc-950">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 min-h-[500px]">
+              {MODEL_IDS.map((id) => (
+                <ModelColumn
+                  key={id}
+                  modelId={id}
+                  state={models[id]}
+                  onRating={(rating) => handleRating(id, rating)}
+                />
+              ))}
+            </div>
+          </div>
+
+          <SummaryBar models={models} history={history} onHistoryClick={handleHistoryClick} />
+        </>
+      ) : (
+        <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
+          <ZappiChat />
+        </div>
+      )}
     </div>
   );
 }
