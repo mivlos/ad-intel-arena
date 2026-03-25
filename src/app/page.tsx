@@ -408,28 +408,29 @@ export default function HomePage() {
                 </div>
               )}
 
-              {/* Ranking bar */}
-              <div className="flex items-center gap-0 bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-                {evaluationResult.ranking.map((platform, rank) => {
-                  const pid = platform as ModelId;
+              {/* Ranking bar — grid matches the 4-column model layout */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {MODEL_IDS.map((pid) => {
                   const p = evaluationResult.platforms[pid];
                   if (!p) return null;
+                  const rank = evaluationResult.ranking.indexOf(pid);
                   const score = pct(p.score, p.total);
                   const config = MODEL_CONFIG[pid];
                   return (
                     <div
-                      key={platform}
-                      className="flex-1 flex items-center gap-2 px-3 py-2.5 border-r border-zinc-800 last:border-r-0"
+                      key={pid}
+                      className="flex items-center gap-2 px-3 py-2.5 bg-zinc-900 border border-zinc-800 rounded-lg"
                     >
-                      <span className="text-base leading-none">{RANK_MEDAL[rank]}</span>
-                      <div className="min-w-0">
+                      <span className="text-base leading-none w-5 shrink-0">{RANK_MEDAL[rank] ?? ''}</span>
+                      <div className="min-w-0 flex-1">
                         <div className={`text-xs font-semibold ${config?.accentText ?? 'text-zinc-400'} truncate`}>
-                          {config?.label ?? platform}
+                          {config?.label ?? pid}
                         </div>
                         <div className={`text-xs font-mono font-bold ${scoreColor(score)}`}>
                           {p.score}/{p.total} ({score}%)
                         </div>
                       </div>
+                      <span className="text-[10px] text-zinc-600 font-mono shrink-0">#{rank + 1}</span>
                     </div>
                   );
                 })}

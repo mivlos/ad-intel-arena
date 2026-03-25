@@ -1,6 +1,6 @@
 'use client';
 
-import { ModelId, ModelState, MODEL_CONFIG, PlatformEvalResult } from '@/lib/types';
+import { ModelId, ModelState, MODEL_CONFIG, PlatformEvalResult, CRITERION_NAMES } from '@/lib/types';
 import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -152,6 +152,29 @@ export default function ModelColumn({ modelId, state, onRating, evalResult }: Mo
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {state.content}
             </ReactMarkdown>
+          </div>
+        )}
+
+        {state.status === 'done' && evalResult && (
+          <div className="mt-4 pt-4 border-t border-zinc-800/60 not-prose">
+            <div className="text-xs font-semibold text-zinc-400 mb-2">
+              Evaluation — {evalResult.score}/{evalResult.total} ({Math.round((evalResult.score / evalResult.total) * 100)}%)
+            </div>
+            <div className="space-y-2">
+              {Object.entries(evalResult.criteria).map(([id, cr]) => (
+                <div key={id} className="flex items-start gap-2">
+                  <span className={`shrink-0 text-xs font-bold mt-0.5 ${cr.pass ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {cr.pass ? '✅' : '❌'}
+                  </span>
+                  <div className="min-w-0">
+                    <span className="text-[11px] font-semibold text-zinc-300">
+                      {id} — {CRITERION_NAMES[id] ?? id}
+                    </span>
+                    <p className="text-[10px] text-zinc-500 leading-snug mt-0.5 break-words">{cr.evidence}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
