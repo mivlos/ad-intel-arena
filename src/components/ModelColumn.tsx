@@ -1,6 +1,6 @@
 'use client';
 
-import { ModelId, ModelState, MODEL_CONFIG } from '@/lib/types';
+import { ModelId, ModelState, MODEL_CONFIG, PlatformEvalResult } from '@/lib/types';
 import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -9,6 +9,7 @@ interface ModelColumnProps {
   modelId: ModelId;
   state: ModelState;
   onRating: (rating: 'up' | 'down') => void;
+  evalResult?: PlatformEvalResult;
 }
 
 function ElapsedTimer({ startTime, endTime }: { startTime: number | null; endTime: number | null }) {
@@ -34,7 +35,47 @@ function ElapsedTimer({ startTime, endTime }: { startTime: number | null; endTim
   );
 }
 
-export default function ModelColumn({ modelId, state, onRating }: ModelColumnProps) {
+function ScoreBadge({ result }: { result: PlatformEvalResult }) {
+  const [open, setOpen] = useState(false);
+  const pct = Math.round((result.score / result.total) * 100);
+  const color = pct > 70 ? 'text-emerald-400 border-emerald-700/60' : pct >= 40 ? 'text-yellow-400 border-yellow-700/60' : 'text-red-400 border-red-700/60';
+
+  const criteriaEntries = Object.entries(result.criteria);
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className={`text-[11px] font-mono font-semibold px-2 py-0.5 rounded border ${color} bg-zinc-900/60 hover:bg-zinc-800 transition-colors`}
+        title="Click to see criterion breakdown"
+      >
+        {result.score}/{result.total} — {pct}%
+      </button>
+      {open && criteriaEntries.length > 0 && (
+        <div className="absolute right-0 top-full mt-1 z-30 w-80 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl overflow-hidden">
+          <div className="px-3 py-2 border-b border-zinc-800 text-[10px] text-zinc-400 uppercase tracking-wide font-semibold">
+            Criterion Breakdown
+          </div>
+          <div className="divide-y divide-zinc-800/60 max-h-64 overflow-y-auto">
+            {criteriaEntries.map(([id, cr]) => (
+              <div key={id} className="flex items-start gap-2 px-3 py-2">
+                <span className={`mt-0.5 shrink-0 text-xs font-bold ${cr.pass ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {cr.pass ? '✓' : '✗'}
+                </span>
+                <div className="min-w-0">
+                  <span className="text-[11px] font-semibold text-zinc-300">{id}</span>
+                  <p className="text-[10px] text-zinc-500 leading-snug mt-0.5">{cr.evidence}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function ModelColumn({ modelId, state, onRating, evalResult }: ModelColumnProps) {
   const config = MODEL_CONFIG[modelId];
 
   const handleCopy = () => {
@@ -63,6 +104,7 @@ export default function ModelColumn({ modelId, state, onRating }: ModelColumnPro
           )}
         </div>
         <div className="flex items-center gap-2">
+          {evalResult && <ScoreBadge result={evalResult} />}
           {state.status === 'loading' || state.status === 'streaming' ? (
             <div className="flex items-center gap-1.5">
               <Spinner color={config.accent} />

@@ -1,14 +1,15 @@
 'use client';
 
-import { ModelId, ModelState, MODEL_CONFIG, QueryHistoryEntry, QueryMode } from '@/lib/types';
+import { ModelId, ModelState, MODEL_CONFIG, QueryHistoryEntry, EvaluationResult } from '@/lib/types';
 
 interface SummaryBarProps {
   models: Record<ModelId, ModelState>;
   history: QueryHistoryEntry[];
   onHistoryClick: (entry: QueryHistoryEntry) => void;
+  evalResult?: EvaluationResult | null;
 }
 
-export default function SummaryBar({ models, history, onHistoryClick }: SummaryBarProps) {
+export default function SummaryBar({ models, history, onHistoryClick, evalResult }: SummaryBarProps) {
   const modelIds: ModelId[] = ['zappi', 'claude', 'gemini', 'openai'];
 
   const doneModels = modelIds.filter((id) => models[id].status === 'done');
@@ -52,6 +53,14 @@ export default function SummaryBar({ models, history, onHistoryClick }: SummaryB
                 <span className="text-zinc-300 font-medium">{avgRating}</span>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Meta-patterns from evaluation */}
+        {evalResult?.metaPatterns && (
+          <div className="flex items-start gap-1.5 text-xs max-w-xl">
+            <span className="text-zinc-500 shrink-0 mt-0.5">Patterns:</span>
+            <span className="text-zinc-400">{evalResult.metaPatterns}</span>
           </div>
         )}
 

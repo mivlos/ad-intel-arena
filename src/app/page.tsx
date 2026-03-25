@@ -6,19 +6,24 @@ import QueryInput from '@/components/QueryInput';
 import ModelColumn from '@/components/ModelColumn';
 import SummaryBar from '@/components/SummaryBar';
 import ZappiChat from '@/components/ZappiChat';
+import EvaluationsTab from '@/components/EvaluationsTab';
 import {
   ModelId,
   ModelState,
   QueryHistoryEntry,
   QueryMode,
   StreamChunk,
+  EvaluationResult,
+  StoredEvaluation,
 } from '@/lib/types';
+import { MODEL_CONFIG } from '@/lib/types';
 
 const HISTORY_KEY = 'ad-intel-arena-history';
 const TAB_KEY = 'ad-intel-arena-tab';
+const EVALS_KEY = 'arena-evaluations';
 const MAX_HISTORY = 10;
 
-type ActiveTab = 'arena' | 'zappi-chat';
+type ActiveTab = 'arena' | 'zappi-chat' | 'evaluations';
 
 const MODEL_IDS: ModelId[] = ['zappi', 'claude', 'gemini', 'openai'];
 
@@ -45,11 +50,29 @@ function makeInitialModels(): Record<ModelId, ModelState> {
   return { zappi: makeIdleState(), claude: makeIdleState(), gemini: makeIdleState(), openai: makeIdleState() };
 }
 
+const RANK_MEDAL = ['🥇', '🥈', '🥉', ''];
+
+function pct(score: number, total: number) {
+  return total > 0 ? Math.round((score / total) * 100) : 0;
+}
+
+function scoreColor(p: number) {
+  if (p > 70) return 'text-emerald-400';
+  if (p >= 40) return 'text-yellow-400';
+  return 'text-red-400';
+}
+
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('arena');
   const [mode, setMode] = useState<QueryMode>('creative');
   const [models, setModels] = useState<Record<ModelId, ModelState>>(makeInitialModels());
   const [history, setHistory] = useState<QueryHistoryEntry[]>([]);
+  const [currentQuery, setCurrentQuery] = useState('');
+
+  // Evaluation state
+  const [evaluationResult, setEvaluationResult] = useState<EvaluationResult | null>(null);
+  const [isEvaluating, setIsEvaluating] = useState(false);
+  const evaluationTriggeredRef = useRef(false);
 
   useEffect(() => {
     try {
@@ -60,7 +83,9 @@ export default function HomePage() {
     }
     try {
       const storedTab = localStorage.getItem(TAB_KEY);
-      if (storedTab === 'arena' || storedTab === 'zappi-chat') setActiveTab(storedTab);
+      if (storedTab === 'arena' || storedTab === 'zappi-chat' || storedTab === 'evaluations') {
+        setActiveTab(storedTab as ActiveTab);
+      }
     } catch {
       // ignore
     }
@@ -85,6 +110,79 @@ export default function HomePage() {
   const updateModel = useCallback((id: ModelId, updates: Partial<ModelState>) => {
     setModels((prev) => ({ ...prev, [id]: { ...prev[id], ...updates } }));
   }, []);
+
+  // Auto-trigger evaluation when all 4 streams complete
+  useEffect(() => {
+    const allDone = MODEL_IDS.every(
+      (id) => models[id].status === 'done' || models[id].status === 'error'
+    );
+    const anyStarted = MODEL_IDS.some(
+      (id) => models[id].status !== 'idle'
+    );
+    const hasContent = MODEL_IDS.some((id) => models[id].content.length > 0);
+
+    if (allDone && anyStarted && hasContent && !evaluationTriggeredRef.current && currentQuery) {
+      evaluationTriggeredRef.current = true;
+      triggerEvaluation();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [models, currentQuery]);
+
+  const triggerEvaluation = useCallback(async () => {
+    setIsEvaluating(true);
+    setEvaluationResult(null);
+
+    const responses = MODEL_IDS.map((id) => ({
+      platform: id,
+      content: models[id].content,
+    })).filter((r) => r.content.length > 0);
+
+    try {
+      const res = await fetch('/api/evaluate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: currentQuery, responses, mode }),
+      });
+
+      if (!res.ok) {
+        console.error('Evaluation failed:', await res.text());
+        return;
+      }
+
+      const result: EvaluationResult = await res.json();
+      setEvaluationResult(result);
+
+      // Persist to localStorage
+      const stored: StoredEvaluation = {
+        date: new Date().toISOString().split('T')[0],
+        query: currentQuery,
+        queryType: result.queryType,
+        evalSet: result.evalSet,
+        platforms: Object.fromEntries(
+          MODEL_IDS.map((id) => [
+            id,
+            { score: result.platforms[id]?.score ?? 0, total: result.platforms[id]?.total ?? 0 },
+          ])
+        ),
+        ranking: result.ranking,
+        convergenceFlag: result.convergenceFlag,
+      };
+
+      try {
+        const existing = localStorage.getItem(EVALS_KEY);
+        const arr: StoredEvaluation[] = existing ? JSON.parse(existing) : [];
+        arr.unshift(stored);
+        localStorage.setItem(EVALS_KEY, JSON.stringify(arr.slice(0, 100)));
+      } catch {
+        // ignore
+      }
+    } catch (err) {
+      console.error('Evaluation error:', err);
+    } finally {
+      setIsEvaluating(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [models, currentQuery, mode]);
 
   const streamModel = useCallback(
     async (id: ModelId, query: string, signal: AbortSignal) => {
@@ -196,6 +294,10 @@ export default function HomePage() {
       });
 
       setModels(makeInitialModels());
+      setCurrentQuery(query);
+      setEvaluationResult(null);
+      setIsEvaluating(false);
+      evaluationTriggeredRef.current = false;
 
       const entry: QueryHistoryEntry = { query, mode, timestamp: Date.now() };
       setHistory((prev) => {
@@ -241,7 +343,7 @@ export default function HomePage() {
   );
 
   return (
-    <div className="flex flex-col min-h-screen bg-zinc-950">
+    <div className="flex flex-col h-screen overflow-hidden bg-zinc-950">
       {/* Tab toggle — very top of page */}
       <div className="sticky top-0 z-20 flex items-center px-6 py-2 bg-zinc-950 border-b border-zinc-800">
         <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-lg p-1">
@@ -265,16 +367,75 @@ export default function HomePage() {
           >
             Zappi Chat
           </button>
+          <button
+            onClick={() => handleTabChange('evaluations')}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+              activeTab === 'evaluations'
+                ? 'bg-zinc-700 text-white shadow-sm'
+                : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            Evaluations
+          </button>
         </div>
       </div>
 
       {activeTab === 'arena' ? (
-        <>
+        <div className="flex-1 flex flex-col overflow-hidden">
           <TopBar mode={mode} onModeChange={setMode} />
 
           <div className="py-6 border-b border-zinc-800/60 bg-zinc-950">
             <QueryInput mode={mode} onSubmit={handleSubmit} isLoading={anyActive} />
           </div>
+
+          {/* Evaluation loading bar */}
+          {isEvaluating && (
+            <div className="px-4 pt-3">
+              <div className="flex items-center gap-2 text-xs text-zinc-400 bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-2.5">
+                <span className="inline-block w-2 h-2 rounded-full bg-violet-500 animate-pulse" />
+                <span className="animate-pulse">Evaluating responses...</span>
+              </div>
+            </div>
+          )}
+
+          {/* Ranking banner */}
+          {evaluationResult && !isEvaluating && (
+            <div className="px-4 pt-3 space-y-2">
+              {/* Convergence warning */}
+              {evaluationResult.convergenceFlag && (
+                <div className="flex items-center gap-2 text-xs text-amber-400 bg-amber-900/20 border border-amber-700/40 rounded-lg px-4 py-2">
+                  ⚠ 3+ platforms converged on the same core recommendation — insight may be directionally correct but competitively undifferentiated
+                </div>
+              )}
+
+              {/* Ranking bar */}
+              <div className="flex items-center gap-0 bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+                {evaluationResult.ranking.map((platform, rank) => {
+                  const pid = platform as ModelId;
+                  const p = evaluationResult.platforms[pid];
+                  if (!p) return null;
+                  const score = pct(p.score, p.total);
+                  const config = MODEL_CONFIG[pid];
+                  return (
+                    <div
+                      key={platform}
+                      className="flex-1 flex items-center gap-2 px-3 py-2.5 border-r border-zinc-800 last:border-r-0"
+                    >
+                      <span className="text-base leading-none">{RANK_MEDAL[rank]}</span>
+                      <div className="min-w-0">
+                        <div className={`text-xs font-semibold ${config?.accentText ?? 'text-zinc-400'} truncate`}>
+                          {config?.label ?? platform}
+                        </div>
+                        <div className={`text-xs font-mono font-bold ${scoreColor(score)}`}>
+                          {p.score}/{p.total} ({score}%)
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="flex-1 overflow-auto p-4 md:p-6 bg-zinc-950">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 min-h-[500px]">
@@ -284,16 +445,26 @@ export default function HomePage() {
                   modelId={id}
                   state={models[id]}
                   onRating={(rating) => handleRating(id, rating)}
+                  evalResult={evaluationResult?.platforms[id] ?? undefined}
                 />
               ))}
             </div>
           </div>
 
-          <SummaryBar models={models} history={history} onHistoryClick={handleHistoryClick} />
-        </>
-      ) : (
+          <SummaryBar
+            models={models}
+            history={history}
+            onHistoryClick={handleHistoryClick}
+            evalResult={evaluationResult}
+          />
+        </div>
+      ) : activeTab === 'zappi-chat' ? (
         <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
           <ZappiChat />
+        </div>
+      ) : (
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <EvaluationsTab />
         </div>
       )}
     </div>

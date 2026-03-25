@@ -29,6 +29,42 @@ export interface StreamChunk {
   message?: string;
 }
 
+// ─── Evaluation types ───────────────────────────────────────────────────────
+
+export interface CriterionResult {
+  pass: boolean;
+  evidence: string;
+}
+
+export interface PlatformEvalResult {
+  score: number;
+  total: number;
+  criteria: Record<string, CriterionResult>;
+}
+
+export interface EvaluationResult {
+  queryType: string;
+  evalSet: string;
+  platforms: Record<ModelId, PlatformEvalResult>;
+  ranking: ModelId[];
+  convergenceFlag: boolean;
+  universallyPassed: string[];
+  universallyFailed: string[];
+  metaPatterns: string;
+}
+
+export interface StoredEvaluation {
+  date: string;
+  query: string;
+  queryType: string;
+  evalSet: string;
+  platforms: Record<string, { score: number; total: number }>;
+  ranking: string[];
+  convergenceFlag: boolean;
+}
+
+// ─── Model config ────────────────────────────────────────────────────────────
+
 export const MODEL_CONFIG: Record<ModelId, { label: string; accent: string; accentBg: string; accentBorder: string; accentText: string; badge?: string }> = {
   zappi: {
     label: 'Zappi Ad Intelligence',
