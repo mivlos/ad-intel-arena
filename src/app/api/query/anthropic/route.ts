@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     async start(controller) {
       try {
         const messageStream = client.messages.stream({
-          model: 'claude-opus-4-20250901',
+          model: 'claude-opus-4-20250514',
           max_tokens: 2048,
           system: SYSTEM_PROMPT,
           messages: [{ role: 'user', content: query }],
