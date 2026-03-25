@@ -36,7 +36,7 @@ export async function POST(request: Request) {
             'Content-Type': 'application/json',
             'x-api-key': apiKey,
           },
-          body: JSON.stringify({ user_assistant_id: assistantId, message: query }),
+          body: JSON.stringify({ user_assistant_id: parseInt(assistantId, 10), message: query }),
         });
 
         if (!sessionRes.ok) {
@@ -49,11 +49,11 @@ export async function POST(request: Request) {
 
         send({ type: 'replace', content: 'Processing...' });
 
-        let status = 'engaging_agent';
+        let status = 'pending';
         let polls = 0;
-        let messages: Array<{ role: string; content: string }> = [];
+        let messages: Array<{ id: number; type: string; sender: string; recipient: string; content: string; created_at: string }> = [];
 
-        while (status === 'engaging_agent' && polls < MAX_POLLS) {
+        while (status !== 'awaiting_input' && polls < MAX_POLLS) {
           await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
           polls++;
 
@@ -78,7 +78,8 @@ export async function POST(request: Request) {
           return;
         }
 
-        const agentMessages = messages.filter((m) => m.role === 'assistant');
+        // Agent messages have a sender that is NOT the api user
+        const agentMessages = messages.filter((m) => !m.sender.startsWith('api-'));
         const lastMessage = agentMessages[agentMessages.length - 1];
 
         if (!lastMessage) {
