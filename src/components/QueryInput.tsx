@@ -3,6 +3,39 @@
 import { QueryMode } from '@/lib/types';
 import { useState, useRef, useEffect } from 'react';
 
+const AD_INSIGHTS = [
+  "73% of Gen Z discover brands through social media — Kantar 2025",
+  "Humour in advertising increases purchase intent by 24% — IPA Databank",
+  "Emotion-led campaigns are 2x more effective than rational ones — System1",
+  "Brand-building drives 60% of sales in the long term — Ehrenberg-Bass",
+  "Attention spans haven't shrunk — they've become more selective — ThinkBox",
+  "Creative quality drives 47% of advertising effectiveness — Nielsen",
+];
+
+function RotatingInsights() {
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setIndex(i => (i + 1) % AD_INSIGHTS.length);
+    }, 6000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="h-8 flex items-center justify-center mb-4 overflow-hidden">
+      <div className="relative w-full text-center">
+        <p
+          key={index}
+          className="text-xs text-zinc-500 italic animate-insightFade"
+        >
+          💡 {AD_INSIGHTS[index]}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 const EXAMPLE_QUERIES: Record<QueryMode, string[]> = {
   creative: [
     'What creative approaches resonate with Gen Z women for beauty brands?',
@@ -52,6 +85,7 @@ export default function QueryInput({ mode, onSubmit, isLoading }: QueryInputProp
 
   return (
     <div className="w-full max-w-4xl mx-auto px-4">
+      <RotatingInsights />
       <form onSubmit={handleSubmit}>
         <div className="relative bg-zinc-900 border border-zinc-700 rounded-xl focus-within:border-zinc-500 transition-colors">
           <textarea

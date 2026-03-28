@@ -50,6 +50,44 @@ function makeInitialModels(): Record<ModelId, ModelState> {
   return { zappi: makeIdleState(), claude: makeIdleState(), gemini: makeIdleState(), openai: makeIdleState() };
 }
 
+const EVAL_CRITERIA_LIST = [
+  'Data specificity & citations',
+  'Cultural/social insight depth',
+  'Actionable recommendations',
+  'Evidence quality',
+  'Local execution detail',
+  'Risk identification',
+  'Category coherence',
+];
+
+function EvalCriteriaAnimation() {
+  const [visible, setVisible] = useState<number[]>([]);
+
+  useEffect(() => {
+    EVAL_CRITERIA_LIST.forEach((_, i) => {
+      setTimeout(() => {
+        setVisible(prev => [...prev, i]);
+      }, i * 100);
+    });
+  }, []);
+
+  return (
+    <div className="space-y-1">
+      {EVAL_CRITERIA_LIST.map((criterion, i) => (
+        <div
+          key={i}
+          className={`flex items-center gap-2 text-xs transition-all duration-200 ${
+            visible.includes(i) ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4'
+          }`}
+        >
+          <span className="text-emerald-400">✅</span>
+          <span className="text-zinc-500">{criterion}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const RANK_MEDAL = ['🥇', '🥈', '🥉', ''];
 
 function pct(score: number, total: number) {
@@ -388,12 +426,15 @@ export default function HomePage() {
             <QueryInput mode={mode} onSubmit={handleSubmit} isLoading={anyActive} />
           </div>
 
-          {/* Evaluation loading bar */}
+          {/* Evaluation loading — animated criteria */}
           {isEvaluating && (
             <div className="px-4 pt-3">
-              <div className="flex items-center gap-2 text-xs text-zinc-400 bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-2.5">
-                <span className="inline-block w-2 h-2 rounded-full bg-violet-500 animate-pulse" />
-                <span className="animate-pulse">Evaluating responses...</span>
+              <div className="bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3">
+                <div className="flex items-center gap-2 text-xs text-zinc-400 mb-2">
+                  <span className="inline-block w-2 h-2 rounded-full bg-violet-500 animate-pulse" />
+                  <span>Evaluating responses...</span>
+                </div>
+                <EvalCriteriaAnimation />
               </div>
             </div>
           )}
