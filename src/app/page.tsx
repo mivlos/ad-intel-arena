@@ -7,6 +7,7 @@ import ModelColumn from '@/components/ModelColumn';
 import SummaryBar from '@/components/SummaryBar';
 import ZappiChat from '@/components/ZappiChat';
 import EvaluationsTab from '@/components/EvaluationsTab';
+import AdScores from '@/components/AdScores';
 import {
   ModelId,
   ModelState,
@@ -23,7 +24,7 @@ const TAB_KEY = 'ad-intel-arena-tab';
 const EVALS_KEY = 'arena-evaluations';
 const MAX_HISTORY = 10;
 
-type ActiveTab = 'arena' | 'zappi-chat' | 'evaluations';
+type ActiveTab = 'arena' | 'zappi-chat' | 'evaluations' | 'ad-scores';
 
 const MODEL_IDS: ModelId[] = ['zappi', 'claude', 'gemini', 'openai'];
 
@@ -121,7 +122,7 @@ export default function HomePage() {
     }
     try {
       const storedTab = localStorage.getItem(TAB_KEY);
-      if (storedTab === 'arena' || storedTab === 'zappi-chat' || storedTab === 'evaluations') {
+      if (storedTab === 'arena' || storedTab === 'zappi-chat' || storedTab === 'evaluations' || storedTab === 'ad-scores') {
         setActiveTab(storedTab as ActiveTab);
       }
     } catch {
@@ -415,6 +416,16 @@ export default function HomePage() {
           >
             Evaluations
           </button>
+          <button
+            onClick={() => handleTabChange('ad-scores')}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+              activeTab === 'ad-scores'
+                ? 'bg-[#FF6B00] text-white shadow-sm'
+                : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            Ad Scores
+          </button>
         </div>
       </div>
 
@@ -504,9 +515,13 @@ export default function HomePage() {
         <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
           <ZappiChat />
         </div>
-      ) : (
+      ) : activeTab === 'evaluations' ? (
         <div className="flex-1 flex flex-col overflow-hidden">
           <EvaluationsTab />
+        </div>
+      ) : (
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <AdScores />
         </div>
       )}
     </div>
